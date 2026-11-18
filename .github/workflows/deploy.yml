@@ -35,7 +35,14 @@ jobs:
         run: npm install
 
       - name: Compilation de l'application (Vite build)
-        run: npm run build
+        run: |
+          if ! npm run build 2>&1 | tee build_output.log; then
+            echo "## ❌ Erreur lors de la compilation Vite" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat build_output.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
       - name: Configuration de GitHub Pages
         uses: actions/configure-pages@v5
