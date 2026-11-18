@@ -554,7 +554,7 @@ const CompactRow: React.FC<CompactRowProps> = ({
           </button>
         </div>
 
-        {activity.commentaires && (
+        {activity.commentaires ? (
           <div
             onClick={onOpenDetail}
             title={`Commentaire réviseur : ${activity.commentaires}`}
@@ -563,7 +563,16 @@ const CompactRow: React.FC<CompactRowProps> = ({
             <span className="font-semibold mr-1">Rév:</span>
             {activity.commentaires}
           </div>
-        )}
+        ) : canEditComments ? (
+          <button
+            type="button"
+            onClick={onOpenDetail}
+            title="Ouvrir la fiche pour ajouter un commentaire réviseur"
+            className="mt-1 text-[10px] text-slate-400 hover:text-emerald-700 italic block transition-colors"
+          >
+            + Note réviseur…
+          </button>
+        ) : null}
       </td>
 
       {/* Responsable (compressed) */}

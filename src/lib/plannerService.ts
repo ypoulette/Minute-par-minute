@@ -46,6 +46,44 @@ export function sanitizeExecutants(
   };
 }
 
+const COMMENT_START = '<!--REVISEUR_COMMENT-->\n';
+const COMMENT_END = '\n<!--/REVISEUR_COMMENT-->';
+
+export function packActivityTexte(cleanTexte: string, commentaires?: string): string {
+  const strippedText = (cleanTexte || '')
+    .replace(/<!--REVISEUR_COMMENT-->[\s\S]*?<!--\/REVISEUR_COMMENT-->/g, '')
+    .trim();
+  const trimmedComment = (commentaires || '').trim();
+
+  if (!trimmedComment) {
+    return strippedText;
+  }
+  if (!strippedText) {
+    return `${COMMENT_START}${trimmedComment}${COMMENT_END}`;
+  }
+  return `${strippedText}\n\n${COMMENT_START}${trimmedComment}${COMMENT_END}`;
+}
+
+export function unpackActivityTexte(
+  rawTexte: string | undefined,
+  directCommentaires?: string
+): { cleanTexte: string; commentaires: string } {
+  const raw = rawTexte || '';
+  const match = raw.match(/<!--REVISEUR_COMMENT-->([\s\S]*?)<!--\/REVISEUR_COMMENT-->/);
+  const unpackedComm = match ? match[1].trim() : '';
+  const clean = raw.replace(/<!--REVISEUR_COMMENT-->[\s\S]*?<!--\/REVISEUR_COMMENT-->/g, '').trim();
+
+  const finalComm =
+    directCommentaires && directCommentaires.trim()
+      ? directCommentaires.trim()
+      : unpackedComm;
+
+  return {
+    cleanTexte: clean,
+    commentaires: finalComm,
+  };
+}
+
 export function sanitizeActivityFields(input: Partial<ActivityItem>): {
   step: number | null;
   etape: string;
@@ -121,10 +159,19 @@ export function subscribeEventActivities(
   return onSnapshot(
     q,
     (snapshot) => {
-      const list: ActivityItem[] = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<ActivityItem, 'id'>),
-      }));
+      const list: ActivityItem[] = snapshot.docs.map((d) => {
+        const raw = d.data();
+        const unpacked = unpackActivityTexte(
+          raw.texte as string | undefined,
+          raw.commentaires as string | undefined
+        );
+        return {
+          id: d.id,
+          ...(raw as Omit<ActivityItem, 'id'>),
+          texte: unpacked.cleanTexte,
+          commentaires: unpacked.commentaires,
+        };
+      });
       onData(list);
     },
     (error) => {
@@ -176,11 +223,14 @@ export async function createEventWithCsv(
     for (const item of chunk) {
       const actId = makeSafeId('act');
       const clean = sanitizeActivityFields(item);
+      const packedTexte = packActivityTexte(clean.texte, clean.commentaires);
+      const { commentaires: _comm, ...cleanForFirestore } = clean;
       batch.set(doc(db, 'events', eventId, 'activities', actId), {
         eventId,
         ownerId: userUid,
         teamEmails,
-        ...clean,
+        ...cleanForFirestore,
+        texte: packedTexte,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -245,11 +295,14 @@ export async function replaceEventActivitiesFromCsv(
     for (const item of chunk) {
       const actId = makeSafeId('act');
       const clean = sanitizeActivityFields(item);
+      const packedTexte = packActivityTexte(clean.texte, clean.commentaires);
+      const { commentaires: _comm, ...cleanForFirestore } = clean;
       batch.set(doc(db, 'events', event.id, 'activities', actId), {
         eventId: event.id,
         ownerId: event.ownerId,
         teamEmails: event.teamEmails,
-        ...clean,
+        ...cleanForFirestore,
+        texte: packedTexte,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -370,6 +423,8 @@ export async function createActivity(
 ): Promise<string> {
   const actId = makeSafeId('act');
   const clean = sanitizeActivityFields(input);
+  const packedTexte = packActivityTexte(clean.texte, clean.commentaires);
+  const { commentaires: _comm, ...cleanForFirestore } = clean;
   const path = `events/${event.id}/activities/${actId}`;
 
   try {
@@ -377,7 +432,8 @@ export async function createActivity(
       eventId: event.id,
       ownerId: event.ownerId,
       teamEmails: event.teamEmails,
-      ...clean,
+      ...cleanForFirestore,
+      texte: packedTexte,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -391,7 +447,8 @@ export async function createActivity(
 export async function updateActivity(
   eventId: string,
   activityId: string,
-  updates: Partial<ActivityItem>
+  updates: Partial<ActivityItem>,
+  currentActivity?: ActivityItem
 ): Promise<void> {
   const payload: Record<string, unknown> = {
     updatedAt: serverTimestamp(),
@@ -430,8 +487,20 @@ export async function updateActivity(
   if (updates.needsCorrection !== undefined) {
     payload.needsCorrection = Boolean(updates.needsCorrection);
   }
-  if (updates.commentaires !== undefined) payload.commentaires = updates.commentaires.slice(0, 50000);
-  if (updates.texte !== undefined) payload.texte = updates.texte.slice(0, 50000);
+
+  const hasTexteUpdate = updates.texte !== undefined;
+  const hasCommUpdate = updates.commentaires !== undefined;
+
+  if (hasTexteUpdate || hasCommUpdate) {
+    const baseTexte = hasTexteUpdate
+      ? updates.texte || ''
+      : (currentActivity?.texte || '');
+    const baseComm = hasCommUpdate
+      ? updates.commentaires || ''
+      : (currentActivity?.commentaires || '');
+
+    payload.texte = packActivityTexte(baseTexte, baseComm).slice(0, 50000);
+  }
 
   const path = `events/${eventId}/activities/${activityId}`;
   try {

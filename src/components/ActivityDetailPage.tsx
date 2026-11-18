@@ -89,6 +89,8 @@ export const ActivityDetailPage: React.FC<ActivityDetailPageProps> = ({
       await onUpdate(activity.id, updates);
       setSavedNotice(true);
       setTimeout(() => setSavedNotice(false), 1600);
+    } catch (err) {
+      console.error('Erreur sauvegarde:', err);
     } finally {
       setSavingField(false);
     }

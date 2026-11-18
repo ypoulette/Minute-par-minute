@@ -336,6 +336,11 @@ function PlannerApp() {
     if (!activeEvent) return;
     const existing = computedActivities.find((a) => a.id === activityId);
 
+    // Optimistic local state update
+    setActivities((prev) =>
+      prev.map((a) => (a.id === activityId ? { ...a, ...updates } : a))
+    );
+
     const etapeChanged =
       updates.etape !== undefined && existing && updates.etape !== existing.etape;
     const stepChanged =
@@ -347,7 +352,7 @@ function PlannerApp() {
       if (etapeChanged && existing.horaireMode === 'dependant') {
         rootUpdates.dependsOnId = null;
       }
-      await updateActivity(activeEvent.id, activityId, rootUpdates);
+      await updateActivity(activeEvent.id, activityId, rootUpdates, existing);
 
       if (subtreeIds.length > 1) {
         const byId = new Map(computedActivities.map((a) => [a.id, a]));
@@ -375,7 +380,7 @@ function PlannerApp() {
       return;
     }
 
-    await updateActivity(activeEvent.id, activityId, updates);
+    await updateActivity(activeEvent.id, activityId, updates, existing);
   };
 
   const handleCreateActivity = async (payload: {

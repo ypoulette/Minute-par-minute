@@ -686,20 +686,27 @@ const ReviewCommentCell: React.FC<ReviewCommentCellProps> = ({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setDraft(value);
-  }, [value]);
+    if (!editing) {
+      setDraft(value);
+    }
+  }, [value, editing]);
 
   const commit = async () => {
+    const trimmed = draft.trim();
     setEditing(false);
-    if (draft.trim() !== (value || '').trim()) {
+    if (trimmed !== (value || '').trim()) {
       setSaving(true);
       try {
-        await onSave(draft.trim());
+        await onSave(trimmed);
+      } catch (err) {
+        console.error('Erreur sauvegarde commentaire:', err);
       } finally {
         setSaving(false);
       }
     }
   };
+
+  const displayValue = saving ? draft : (value || draft);
 
   if (disabled) {
     if (!value) return <span className="text-slate-300 text-xs">—</span>;
@@ -739,7 +746,7 @@ const ReviewCommentCell: React.FC<ReviewCommentCellProps> = ({
     );
   }
 
-  if (value) {
+  if (displayValue) {
     return (
       <div className="flex items-center gap-1 max-w-[230px]">
         <button
@@ -749,8 +756,9 @@ const ReviewCommentCell: React.FC<ReviewCommentCellProps> = ({
           className="truncate text-left text-xs font-medium text-emerald-800 bg-emerald-50 hover:bg-emerald-100/90 px-2 py-1 rounded border border-emerald-200 flex-1 transition-colors"
         >
           <span className="font-semibold text-emerald-950 mr-1">Rév:</span>
-          {value}
+          {displayValue}
         </button>
+        {saving && <span className="text-[10px] text-emerald-600 animate-pulse font-mono">…</span>}
       </div>
     );
   }
