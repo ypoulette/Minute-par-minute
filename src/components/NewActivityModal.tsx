@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Calendar, Plus, X } from 'lucide-react';
 import type { ComputedActivity, EventPlan, HoraireMode } from '../types/planner';
 import { getEtapeDisplay } from '../utils/etapeDefaults';
-import { computeActivityDate, normalizeTimeInput } from '../utils/scheduleEngine';
+import {
+  computeActivityDate,
+  diffDaysBetweenDates,
+  normalizeTimeInput,
+} from '../utils/scheduleEngine';
 import { ResourceCreatableSelect } from './ResourceCreatableSelect';
 import { ResourceMultiSelect } from './ResourceMultiSelect';
 import { TimePickerDropdown } from './TimePickerDropdown';
@@ -45,6 +49,14 @@ export const NewActivityModal: React.FC<NewActivityModalProps> = ({
   onClose,
 }) => {
   const [stepStr, setStepStr] = useState(defaultStep === null ? '' : String(defaultStep));
+
+  // Date spécifique initiale
+  const initialDate =
+    defaultStep !== null ? computeActivityDate(event.eventDate, defaultStep) : event.eventDate;
+  const [specificDate, setSpecificDate] = useState<string>(
+    /^\d{4}-\d{2}-\d{2}$/.test(initialDate) ? initialDate : event.eventDate
+  );
+
   const [etape, setEtape] = useState(defaultEtape || event.etapes[0] || '');
   const [horaireMode, setHoraireMode] = useState<HoraireMode>(
     defaultDependsOnId ? 'dependant' : 'manuel'
@@ -61,7 +73,53 @@ export const NewActivityModal: React.FC<NewActivityModalProps> = ({
 
   const parsedStep = stepStr.trim() === '' ? null : parseInt(stepStr, 10);
   const validStep = parsedStep !== null && !Number.isNaN(parsedStep) ? parsedStep : null;
-  const previewDate = computeActivityDate(event.eventDate, validStep);
+
+  // Synchronisation calendrier -> step relatif
+  const handleDateChange = (newDate: string) => {
+    setSpecificDate(newDate);
+    if (!newDate) {
+      setStepStr('');
+      return;
+    }
+    const diff = diffDaysBetweenDates(newDate, event.eventDate);
+    if (diff !== null) {
+      setStepStr(String(diff));
+    }
+  };
+
+  // Synchronisation step relatif -> calendrier
+  const handleStepChange = (val: string) => {
+    setStepStr(val);
+    const trimmed = val.trim();
+    if (trimmed === '') return;
+    const parsed = parseInt(trimmed, 10);
+    if (!Number.isNaN(parsed)) {
+      const computed = computeActivityDate(event.eventDate, parsed);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(computed)) {
+        setSpecificDate(computed);
+      }
+    }
+  };
+
+  const handlePresetDate = (stepVal: number | null) => {
+    if (stepVal === null) {
+      setStepStr('');
+    } else {
+      setStepStr(String(stepVal));
+      const computed = computeActivityDate(event.eventDate, stepVal);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(computed)) {
+        setSpecificDate(computed);
+      }
+    }
+  };
+
+  const previewDateLabel = useMemo(() => {
+    if (validStep === null) return 'Statut : À planifier (sans date fixée)';
+    const date = computeActivityDate(event.eventDate, validStep);
+    if (validStep === 0) return `Jour J : ${date} (jour de l'événement)`;
+    if (validStep > 0) return `${date} (+${validStep} j après l'événement)`;
+    return `${date} (${Math.abs(validStep)} j avant l'événement)`;
+  }, [event.eventDate, validStep]);
 
   const etapeLabels: Record<string, string> = {};
   for (const et of event.etapes) {
@@ -119,25 +177,117 @@ export const NewActivityModal: React.FC<NewActivityModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Step (jours vs événement)
-              </label>
-              <input
-                type="number"
-                value={stepStr}
-                onChange={(e) => setStepStr(e.target.value)}
-                placeholder="ex. -1, 0, 1"
-                className="w-full px-3 py-2 text-sm font-mono border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-              <p className="mt-1 text-xs text-slate-500 font-mono">Date : {previewDate}</p>
+          {/* Bloc 1: Date spécifique (calendrier) & Step relatif */}
+          <div className="bg-slate-50/90 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                Date de l'activité & Step
+              </span>
+              <span className="text-[11px] text-slate-500 font-mono">
+                Événement : <strong className="text-slate-700">{event.eventDate}</strong> (Jour J)
+              </span>
             </div>
 
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Bloc / Étape critique
-              </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Calendrier date spécifique */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Choisir une date spécifique (calendrier)
+                </label>
+                <input
+                  type="date"
+                  value={specificDate}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white"
+                />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Calcule automatiquement le Step selon l'événement
+                </p>
+              </div>
+
+              {/* Step relatif */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Step (jours vs événement)
+                </label>
+                <input
+                  type="number"
+                  value={stepStr}
+                  onChange={(e) => handleStepChange(e.target.value)}
+                  placeholder="ex. -1, 0, 1 (ou vide pour À planifier)"
+                  className="w-full px-3 py-1.5 text-sm font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white"
+                />
+                <p className="mt-1 text-[11px] font-medium text-blue-700 font-mono">
+                  {previewDateLabel}
+                </p>
+              </div>
+            </div>
+
+            {/* Raccourcis rapides */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/60 text-[11px]">
+              <span className="text-slate-500 mr-1 font-medium">Raccourcis :</span>
+              <button
+                type="button"
+                onClick={() => handlePresetDate(0)}
+                className={`px-2 py-0.5 rounded border transition-colors ${
+                  validStep === 0
+                    ? 'bg-blue-600 text-white border-blue-600 font-medium shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                }`}
+              >
+                Jour J (0 j)
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePresetDate(-1)}
+                className={`px-2 py-0.5 rounded border transition-colors ${
+                  validStep === -1
+                    ? 'bg-blue-600 text-white border-blue-600 font-medium shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                }`}
+              >
+                Veille (J-1)
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePresetDate(1)}
+                className={`px-2 py-0.5 rounded border transition-colors ${
+                  validStep === 1
+                    ? 'bg-blue-600 text-white border-blue-600 font-medium shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                }`}
+              >
+                Lendemain (J+1)
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePresetDate(null)}
+                className={`px-2 py-0.5 rounded border transition-colors ${
+                  validStep === null
+                    ? 'bg-amber-600 text-white border-amber-600 font-medium shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                }`}
+              >
+                À planifier
+              </button>
+            </div>
+          </div>
+
+          {/* Bloc / Étape critique */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">
+              Bloc / Étape critique
+            </label>
+            <ResourceCreatableSelect
+              value={etape}
+              options={event.etapes}
+              optionLabels={etapeLabels}
+              onChange={(val) => setEtape(val)}
+              onAddOption={onAddEtape}
+              placeholder="Sélectionner ou créer un bloc..."
+            />
+          </div>
               <ResourceCreatableSelect
                 value={etape}
                 options={event.etapes}

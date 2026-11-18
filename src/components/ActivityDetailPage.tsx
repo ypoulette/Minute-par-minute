@@ -13,6 +13,7 @@ import type { ActivityItem, ComputedActivity, EventPlan, HoraireMode, TeamRole }
 import { getEtapeDisplay } from '../utils/etapeDefaults';
 import {
   computeActivityDate,
+  diffDaysBetweenDates,
   formatDurationLabel,
   wouldCreateDependencyCycle,
 } from '../utils/scheduleEngine';
@@ -117,6 +118,20 @@ export const ActivityDetailPage: React.FC<ActivityDetailPageProps> = ({
     const clean = parsed !== null && !Number.isNaN(parsed) ? parsed : null;
     if (clean !== activity.step) {
       await commitUpdate({ step: clean });
+    }
+  };
+
+  const handleDateChange = async (newDate: string) => {
+    if (!canEditCore) return;
+    if (!newDate) {
+      setStepStr('');
+      await commitUpdate({ step: null });
+      return;
+    }
+    const diff = diffDaysBetweenDates(newDate, event.eventDate);
+    if (diff !== null && diff !== activity.step) {
+      setStepStr(String(diff));
+      await commitUpdate({ step: diff });
     }
   };
 
@@ -411,11 +426,31 @@ export const ActivityDetailPage: React.FC<ActivityDetailPageProps> = ({
               )}
             </h3>
 
-            {/* Step & Date */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Step & Date avec calendrier synchronisé */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50/80 rounded-xl border border-slate-200">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Step (jours)
+                  Date spécifique (calendrier) {!canEditCore && <span className="text-slate-400 font-normal">(lecture)</span>}
+                </label>
+                <input
+                  type="date"
+                  disabled={!canEditCore}
+                  value={/^\d{4}-\d{2}-\d{2}$/.test(previewDate) ? previewDate : ''}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  className={`w-full px-3 py-1.5 text-sm font-mono border rounded-lg focus:outline-none ${
+                    canEditCore
+                      ? 'border-slate-300 focus:ring-2 focus:ring-blue-600 bg-white'
+                      : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-default'
+                  }`}
+                />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Choisir directement la date dans le calendrier
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Step relatif (jours vs événement) {!canEditCore && <span className="text-slate-400 font-normal">(lecture)</span>}
                 </label>
                 <input
                   type="number"
@@ -423,21 +458,22 @@ export const ActivityDetailPage: React.FC<ActivityDetailPageProps> = ({
                   value={stepStr}
                   onChange={(e) => setStepStr(e.target.value)}
                   onBlur={handleStepBlur}
-                  placeholder="—"
-                  className={`w-full px-3 py-2 text-sm font-mono border rounded-lg focus:outline-none ${
+                  placeholder="— (À planifier)"
+                  className={`w-full px-3 py-1.5 text-sm font-mono border rounded-lg focus:outline-none ${
                     canEditCore
-                      ? 'border-slate-200 focus:ring-2 focus:ring-blue-600 bg-white'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 cursor-default'
+                      ? 'border-slate-300 focus:ring-2 focus:ring-blue-600 bg-white'
+                      : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-default'
                   }`}
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Date calculée
-                </label>
-                <div className="px-3 py-2 text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg text-slate-700 tabular-nums">
-                  {previewDate}
-                </div>
+                <p className="mt-1 text-[11px] text-slate-500 font-mono">
+                  {stepStr.trim() === ''
+                    ? 'À planifier'
+                    : parseInt(stepStr, 10) === 0
+                    ? `Jour J (${previewDate})`
+                    : parseInt(stepStr, 10) > 0
+                    ? `+${stepStr} j après (${previewDate})`
+                    : `${stepStr} j avant (${previewDate})`}
+                </p>
               </div>
             </div>
 

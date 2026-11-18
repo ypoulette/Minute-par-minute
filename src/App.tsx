@@ -309,14 +309,35 @@ function PlannerApp() {
     await updateEventMetadata(activeEvent.id, { resources: next });
   };
 
-  const handleAddEtape = async (name: string) => {
+  const handleAddEtape = async (
+    name: string,
+    position: 'auto' | 'start' | 'before' | 'end' = 'auto',
+    targetEtape?: string
+  ) => {
     if (!activeEvent) return;
     const trimmed = name.trim();
     if (!trimmed) return;
     if (activeEvent.etapes.some((et) => et.toLowerCase() === trimmed.toLowerCase())) {
       return;
     }
-    const next = [...activeEvent.etapes, trimmed];
+    let next: string[];
+    if (position === 'start') {
+      next = [trimmed, ...activeEvent.etapes];
+    } else if (position === 'before' && targetEtape) {
+      const idx = activeEvent.etapes.indexOf(targetEtape);
+      if (idx >= 0) {
+        next = [...activeEvent.etapes.slice(0, idx), trimmed, ...activeEvent.etapes.slice(idx)];
+      } else {
+        next = [trimmed, ...activeEvent.etapes];
+      }
+    } else if (position === 'end') {
+      next = [...activeEvent.etapes, trimmed];
+    } else {
+      // 'auto': tri automatique alphanumérique naturel (ex: Bloc -01 avant Bloc 00)
+      next = [...activeEvent.etapes, trimmed].sort((a, b) =>
+        a.localeCompare(b, 'fr', { numeric: true, sensitivity: 'base' })
+      );
+    }
     await updateEventMetadata(activeEvent.id, { etapes: next });
   };
 
