@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Plus, X } from 'lucide-react';
 
 interface ResourceCreatableSelectProps {

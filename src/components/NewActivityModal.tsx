@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import type { ComputedActivity, EventPlan, HoraireMode } from '../types/planner';
 import { getEtapeDisplay } from '../utils/etapeDefaults';

@@ -1,4 +1,4 @@
-﻿import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 import type { ComputedActivity, EtapeDetail } from '../types/planner';
 import { getEtapeDisplay } from './etapeDefaults';
 

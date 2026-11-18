@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Layers, Plus, Trash2, UserCheck, X } from 'lucide-react';
 import type { EtapeDetail, EventPlan } from '../types/planner';
 import { getEtapeDisplay } from '../utils/etapeDefaults';

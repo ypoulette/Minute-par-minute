@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Clock } from 'lucide-react';
 import { normalizeTimeInput } from '../utils/scheduleEngine';
 

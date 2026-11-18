@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Check, Copy, Plus, Trash2, Users, X, Shield, Edit3, MessageSquare, Eye } from 'lucide-react';
 import type { EventPlan, TeamRole } from '../types/planner';
 

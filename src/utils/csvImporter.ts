@@ -1,4 +1,4 @@
-﻿import type { EtapeDetail, HoraireMode } from '../types/planner';
+import type { EtapeDetail, HoraireMode } from '../types/planner';
 import { DEFAULT_ETAPE_DETAILS } from './etapeDefaults';
 import { diffDaysBetweenDates, normalizeTimeInput, parseTimeToMinutes } from './scheduleEngine';
 

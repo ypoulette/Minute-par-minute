@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { FileSpreadsheet, RotateCcw, Upload, X } from 'lucide-react';
 import { loadBundledEventCsv, parseEventCsv, type ParsedCsvPlan } from '../utils/csvImporter';
 

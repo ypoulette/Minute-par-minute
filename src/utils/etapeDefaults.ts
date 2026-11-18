@@ -1,4 +1,4 @@
-﻿import type { EtapeDetail } from '../types/planner';
+import type { EtapeDetail } from '../types/planner';
 
 export const DEFAULT_ETAPE_DETAILS: Record<string, EtapeDetail> = {
   'Bloc 00': {
