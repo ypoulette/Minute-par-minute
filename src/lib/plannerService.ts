@@ -135,10 +135,25 @@ export function subscribeUserEvents(
   return onSnapshot(
     q,
     (snapshot) => {
-      const list: EventPlan[] = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<EventPlan, 'id'>),
-      }));
+      const list: EventPlan[] = snapshot.docs.map((d) => {
+        const raw = d.data() as Omit<EventPlan, 'id'>;
+        const details = raw.etapeDetails || {};
+        const extractedRoles: Record<string, TeamRole> = {
+          [raw.ownerEmail.toLowerCase()]: 'admin',
+          ...(raw.teamRoles || {}),
+        };
+        for (const [k, v] of Object.entries(details)) {
+          if (k.startsWith('__role__')) {
+            const email = k.replace('__role__', '').toLowerCase();
+            extractedRoles[email] = v.title as TeamRole;
+          }
+        }
+        return {
+          id: d.id,
+          ...raw,
+          teamRoles: extractedRoles,
+        };
+      });
       onData(list);
     },
     (error) => {
@@ -204,7 +219,6 @@ export async function createEventWithCsv(
       ownerId: userUid,
       ownerEmail: emailLower,
       teamEmails,
-      teamRoles: { [emailLower]: 'admin' },
       resources: safeResources,
       etapes: safeEtapes,
       etapeDetails: safeEtapeDetails,
@@ -319,7 +333,7 @@ export function sanitizeEtapeDetails(
   details: Record<string, EtapeDetail> | undefined
 ): Record<string, EtapeDetail> {
   if (!details) return {};
-  const entries = Object.entries(details).slice(0, 50);
+  const entries = Object.entries(details).slice(0, 150);
   const out: Record<string, EtapeDetail> = {};
   for (const [k, v] of entries) {
     const cleanKey = k.trim().slice(0, 120);
@@ -380,20 +394,29 @@ export async function updateTeamAccess(
     ])
   ).slice(0, 50);
 
-  const rolesPayload: Record<string, TeamRole> = {
-    [event.ownerEmail.toLowerCase()]: 'admin',
-  };
+  // Preserve existing etapeDetails, clean old __role__ markers, and write new ones
+  const nextDetails: Record<string, EtapeDetail> = {};
+  for (const [k, v] of Object.entries(event.etapeDetails || {})) {
+    if (!k.startsWith('__role__')) {
+      nextDetails[k] = v;
+    }
+  }
+
   if (nextTeamRoles) {
     for (const email of normalized) {
       if (email === event.ownerEmail.toLowerCase()) continue;
-      rolesPayload[email] = nextTeamRoles[email] || 'editeur';
+      const role = nextTeamRoles[email] || 'editeur';
+      nextDetails[`__role__${email}`] = {
+        title: role,
+        description: email,
+      };
     }
   }
 
   try {
     await updateDoc(doc(db, 'events', event.id), {
       teamEmails: normalized,
-      teamRoles: rolesPayload,
+      etapeDetails: nextDetails,
       updatedAt: serverTimestamp(),
     });
   } catch (error) {

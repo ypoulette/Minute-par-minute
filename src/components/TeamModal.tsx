@@ -33,6 +33,24 @@ const ROLE_LABELS: Record<TeamRole, { label: string; desc: string; icon: React.R
   },
 };
 
+function formatFriendlyError(err: unknown): string {
+  if (err instanceof Error) {
+    try {
+      const parsed = JSON.parse(err.message);
+      if (parsed.error && typeof parsed.error === 'string') {
+        if (parsed.error.includes('Missing or insufficient permissions')) {
+          return "Permissions insuffisantes : seul le propriétaire de l'événement peut gérer les accès.";
+        }
+        return parsed.error;
+      }
+    } catch {
+      return err.message;
+    }
+    return err.message;
+  }
+  return 'Erreur lors de la mise à jour des accès.';
+}
+
 export const TeamModal: React.FC<TeamModalProps> = ({
   event,
   currentUserEmail,
@@ -86,7 +104,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({
       await onSaveTeam(merged, nextRoles);
       setInput('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour.');
+      setError(formatFriendlyError(err));
     } finally {
       setSaving(false);
     }
@@ -103,7 +121,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({
     try {
       await onSaveTeam(event.teamEmails, nextRoles);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du changement de rôle.');
+      setError(formatFriendlyError(err));
     } finally {
       setSaving(false);
     }
@@ -119,7 +137,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({
     try {
       await onSaveTeam(nextEmails, nextRoles);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du retrait.');
+      setError(formatFriendlyError(err));
     } finally {
       setSaving(false);
     }
