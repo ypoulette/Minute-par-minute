@@ -473,11 +473,6 @@ const CompactRow: React.FC<CompactRowProps> = ({
           }`}
         />
       </td>
-          aria-label="Correction nécessaire"
-          title="Cocher si une correction est nécessaire"
-          className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer accent-amber-600 align-middle"
-        />
-      </td>
       {/* # WBS */}
       <td className="py-2 px-1 text-center font-mono text-[11px] tabular-nums text-slate-500 truncate">
         <span className={isChild ? 'text-blue-700 font-medium' : ''}>
@@ -656,14 +651,6 @@ const CompactRow: React.FC<CompactRowProps> = ({
                 type="button"
                 onClick={onOpenDetail}
                 title="Ouvrir la fiche détaillée"
-                className="p-1 text-slate-400 hover:text-blue-700 rounded hover:bg-white"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
-      </td>
                 className="p-1 text-slate-400 hover:text-blue-700 rounded hover:bg-white"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
