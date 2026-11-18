@@ -283,23 +283,13 @@ export const NewActivityModal: React.FC<NewActivityModalProps> = ({
               value={etape}
               options={event.etapes}
               optionLabels={etapeLabels}
-              onChange={(val) => setEtape(val)}
-              onAddOption={onAddEtape}
               placeholder="Sélectionner ou créer un bloc..."
+              onChange={(val) => {
+                setEtape(val);
+                setDependsOnId(null);
+              }}
+              onAddOption={onAddEtape}
             />
-          </div>
-              <ResourceCreatableSelect
-                value={etape}
-                options={event.etapes}
-                optionLabels={etapeLabels}
-                placeholder="Choisir ou ajouter un bloc..."
-                onChange={(val) => {
-                  setEtape(val);
-                  setDependsOnId(null);
-                }}
-                onAddOption={onAddEtape}
-              />
-            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
