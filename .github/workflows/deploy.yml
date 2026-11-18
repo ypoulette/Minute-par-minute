@@ -30,10 +30,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Installation des dépendances
-        run: npm ci || npm install
+        run: npm install
 
       - name: Compilation de l'application (Vite build)
         run: npm run build
