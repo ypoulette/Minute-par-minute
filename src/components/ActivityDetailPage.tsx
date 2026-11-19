@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -9,6 +10,7 @@ import {
   MessageSquare,
   Shield,
   Trash2,
+  X,
 } from 'lucide-react';
 import type { ActivityItem, ComputedActivity, EventPlan, HoraireMode, TeamRole } from '../types/planner';
 import { getEtapeDisplay } from '../utils/etapeDefaults';
@@ -547,15 +549,39 @@ export const ActivityDetailPage: React.FC<ActivityDetailPageProps> = ({
             {/* Horaire value or Parent Activity selector */}
             {activity.horaireMode === 'manuel' ? (
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Heure manuelle
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-600">
+                    Heure manuelle
+                  </label>
+                  {canEditCore && Boolean(activity.horaireManuel) && (
+                    <button
+                      type="button"
+                      onClick={() => commitUpdate({ horaireManuel: '' })}
+                      className="text-[11px] font-medium text-red-600 hover:text-red-800 hover:underline inline-flex items-center gap-1"
+                      title="Effacer uniquement l'heure manuelle de cette activité"
+                    >
+                      <X className="w-3 h-3" />
+                      Effacer l'heure
+                    </button>
+                  )}
+                </div>
                 {canEditCore ? (
-                  <TimePickerDropdown
-                    value={activity.horaireManuel}
-                    suggestedNextTime={suggestedNextTime}
-                    onChange={(nextVal) => commitUpdate({ horaireManuel: nextVal })}
-                  />
+                  <div className="space-y-1.5">
+                    <TimePickerDropdown
+                      value={activity.horaireManuel}
+                      suggestedNextTime={suggestedNextTime}
+                      onChange={(nextVal) => commitUpdate({ horaireManuel: nextVal })}
+                    />
+                    {activity.horaireManuel ? (
+                      <p className="text-[11px] text-slate-400">
+                        Pour retirer l'heure, cliquez sur <em>« Effacer l'heure »</em> ci-dessus.
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">
+                        Aucune heure définie (l'activité s'affiche avec « — »).
+                      </p>
+                    )}
+                  </div>
                 ) : (
                   <div className="px-3 py-2 text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
                     {activity.horaireManuel || '—'}
@@ -564,9 +590,22 @@ export const ActivityDetailPage: React.FC<ActivityDetailPageProps> = ({
               </div>
             ) : (
               <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-lg space-y-2">
-                <label className="block text-xs font-medium text-blue-900">
-                  Activité parente (prédécesseur)
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-blue-900">
+                    Activité parente (prédécesseur)
+                  </label>
+                  {canEditCore && (
+                    <button
+                      type="button"
+                      onClick={() => commitUpdate({ horaireMode: 'manuel', horaireManuel: '' })}
+                      className="text-[11px] font-medium text-blue-700 hover:text-red-700 hover:underline inline-flex items-center gap-1"
+                      title="Détacher la dépendance et retirer l'heure calculée"
+                    >
+                      <X className="w-3 h-3" />
+                      Détacher l'heure
+                    </button>
+                  )}
+                </div>
                 <select
                   disabled={!canEditCore}
                   value={activity.parentId || ''}
@@ -727,36 +766,50 @@ export const ActivityDetailPage: React.FC<ActivityDetailPageProps> = ({
               </label>
             </div>
 
-            {/* Delete */}
+            {/* Zone de suppression de l'activité complète */}
             {canDelete && (
-              <div className="pt-3 border-t border-slate-100">
-                {!confirmDelete ? (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(true)}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Supprimer cette activité
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onDelete(activity.id)}
-                      className="flex-1 px-3 py-2 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
-                    >
-                      Confirmer la suppression
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDelete(false)}
-                      className="px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
-                    >
-                      Annuler
-                    </button>
+              <div className="pt-4 mt-6 border-t border-slate-200">
+                <div className="p-3.5 bg-red-50/60 border border-red-200 rounded-xl space-y-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-red-950">
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                    <span>Zone de danger : Supprimer l’activité</span>
                   </div>
-                )}
+                  <p className="text-[11px] text-red-700 leading-snug">
+                    Attention : cette action supprime <strong>l'activité au complet</strong> (titre, notes, intervenants et horaire). Pour seulement effacer l'heure, utilisez le bouton <em>« Effacer l'heure »</em> plus haut.
+                  </p>
+                  {!confirmDelete ? (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(true)}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-600 hover:text-white transition-colors shadow-sm"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Supprimer toute l’activité
+                    </button>
+                  ) : (
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-semibold text-red-900">
+                        Êtes-vous certain de vouloir supprimer définitivement « {activity.activite} » ?
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onDelete(activity.id)}
+                          className="flex-1 px-3 py-2 text-xs font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 shadow-sm"
+                        >
+                          Oui, supprimer toute l’activité
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDelete(false)}
+                          className="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

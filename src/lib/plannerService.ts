@@ -605,3 +605,27 @@ export async function deleteActivity(eventId: string, activityId: string): Promi
     handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
+
+export async function restoreActivity(
+  event: EventPlan,
+  activity: ActivityItem
+): Promise<void> {
+  const clean = sanitizeActivityFields(activity);
+  const packedTexte = packActivityTexte(clean.texte, clean.commentaires, clean.isDone);
+  const { commentaires: _comm, isDone: _done, ...cleanForFirestore } = clean;
+  const path = `events/${event.id}/activities/${activity.id}`;
+
+  try {
+    await setDoc(doc(db, 'events', event.id, 'activities', activity.id), {
+      eventId: event.id,
+      ownerId: event.ownerId,
+      teamEmails: event.teamEmails,
+      ...cleanForFirestore,
+      texte: packedTexte,
+      createdAt: activity.createdAt || serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+  }
+}

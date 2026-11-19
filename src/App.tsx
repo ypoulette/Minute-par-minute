@@ -7,8 +7,10 @@ import {
   Layers,
   LogOut,
   Plus,
+  RotateCcw,
   Search,
   Users,
+  X,
 } from 'lucide-react';
 import { ActivityDetailPage } from './components/ActivityDetailPage';
 import { AuthScreen } from './components/AuthScreen';
@@ -26,6 +28,7 @@ import {
   createEventWithCsv,
   deleteActivity,
   replaceEventActivitiesFromCsv,
+  restoreActivity,
   subscribeEventActivities,
   subscribeUserEvents,
   updateActivity,
@@ -45,10 +48,74 @@ import { getEtapeDisplay } from './utils/etapeDefaults';
 import { exportActivitiesToExcel } from './utils/excelExport';
 import { collectDependentSubtreeIds, computeSchedule } from './utils/scheduleEngine';
 
+interface UndoEntry {
+  id: string;
+  description: string;
+  undo: () => Promise<void>;
+  timestamp: number;
+}
+
 function PlannerApp() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [emailVerifiedTick, setEmailVerifiedTick] = useState(0);
+
+  // Undo system
+  const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
+  const [undoToast, setUndoToast] = useState<UndoEntry | null>(null);
+  const [undoing, setUndoing] = useState(false);
+
+  const pushUndoAction = (action: { description: string; undo: () => Promise<void> }) => {
+    const entry: UndoEntry = {
+      id: Math.random().toString(36).slice(2, 9),
+      description: action.description,
+      undo: action.undo,
+      timestamp: Date.now(),
+    };
+    setUndoStack((prev) => [entry, ...prev].slice(0, 30));
+    setUndoToast(entry);
+  };
+
+  const handleUndo = async () => {
+    if (undoStack.length === 0 || undoing) return;
+    const [latest, ...rest] = undoStack;
+    setUndoStack(rest);
+    setUndoToast(null);
+    setUndoing(true);
+    try {
+      await latest.undo();
+    } catch (err) {
+      console.error('Erreur lors de l’annulation (undo):', err);
+    } finally {
+      setUndoing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!undoToast) return;
+    const timer = setTimeout(() => {
+      setUndoToast(null);
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, [undoToast]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        const target = e.target as HTMLElement | null;
+        const isEditingInput =
+          target &&
+          (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') &&
+          (target as HTMLInputElement).type !== 'checkbox' &&
+          (target as HTMLInputElement).type !== 'radio';
+        if (isEditingInput) return;
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [undoStack, undoing]);
 
   const [events, setEvents] = useState<EventPlan[]>([]);
   const [eventsLoaded, setEventsLoaded] = useState(false);
@@ -368,6 +435,38 @@ function PlannerApp() {
     if (!activeEvent) return;
     const existing = computedActivities.find((a) => a.id === activityId);
 
+    if (existing) {
+      const previousSnapshot: Partial<ActivityItem> = {};
+      for (const key of Object.keys(updates) as Array<keyof ActivityItem>) {
+        (previousSnapshot as any)[key] = (existing as any)[key];
+      }
+      let desc = `Modification de « ${existing.activite} »`;
+      if (updates.horaireManuel !== undefined) {
+        desc = updates.horaireManuel
+          ? `Heure définie à ${updates.horaireManuel} pour « ${existing.activite} »`
+          : `Heure effacée pour « ${existing.activite} »`;
+      } else if (updates.isDone !== undefined) {
+        desc = updates.isDone
+          ? `Activité « ${existing.activite} » marquée terminée`
+          : `Activité « ${existing.activite} » marquée non terminée`;
+      } else if (updates.needsCorrection !== undefined) {
+        desc = updates.needsCorrection
+          ? `Correction signalée sur « ${existing.activite} »`
+          : `Correction retirée sur « ${existing.activite} »`;
+      }
+
+      pushUndoAction({
+        description: desc,
+        undo: async () => {
+          setActivities((prev) =>
+            prev.map((a) => (a.id === activityId ? { ...a, ...previousSnapshot } : a))
+          );
+          const curr = activities.find((a) => a.id === activityId);
+          await updateActivity(activeEvent.id, activityId, previousSnapshot, curr);
+        },
+      });
+    }
+
     // Optimistic local state update
     setActivities((prev) =>
       prev.map((a) => (a.id === activityId ? { ...a, ...updates } : a))
@@ -442,12 +541,26 @@ function PlannerApp() {
 
   const handleDeleteActivity = async (activityId: string) => {
     if (!activeEvent) return;
+    const deletedActivity = activities.find((a) => a.id === activityId);
+    if (!deletedActivity) return;
+
+    // Detach any direct dependent children so they keep their last calculated start time cleanly
+    const directChildren = computedActivities.filter((a) => a.parentId === activityId);
+    const childrenSnapshot = directChildren.map((child) => ({
+      id: child.id,
+      orderIndex: child.orderIndex,
+      horaireMode: child.horaireMode,
+      dependsOnId: child.dependsOnId,
+      horaireManuel: child.horaireManuel,
+    }));
+
     if (selectedActivityId === activityId) {
       setSelectedActivityId(null);
     }
 
-    // Detach any direct dependent children so they keep their last calculated start time cleanly
-    const directChildren = computedActivities.filter((a) => a.parentId === activityId);
+    // Optimistic local state removal
+    setActivities((prev) => prev.filter((a) => a.id !== activityId));
+
     if (directChildren.length > 0) {
       await batchUpdateActivitiesOrder(
         activeEvent.id,
@@ -463,6 +576,26 @@ function PlannerApp() {
     }
 
     await deleteActivity(activeEvent.id, activityId);
+
+    pushUndoAction({
+      description: `Suppression de « ${deletedActivity.activite} »`,
+      undo: async () => {
+        setActivities((prev) => [...prev, deletedActivity]);
+        await restoreActivity(activeEvent, deletedActivity);
+        if (childrenSnapshot.length > 0) {
+          await batchUpdateActivitiesOrder(
+            activeEvent.id,
+            childrenSnapshot.map((c) => ({
+              id: c.id,
+              orderIndex: c.orderIndex,
+              horaireMode: c.horaireMode,
+              dependsOnId: c.dependsOnId,
+              horaireManuel: c.horaireManuel,
+            }))
+          );
+        }
+      },
+    });
   };
 
   const handleReorderDrop = async (
@@ -582,6 +715,23 @@ function PlannerApp() {
     });
 
     if (batchUpdates.length > 0) {
+      const prevOrderSnapshot = computedActivities.map((a) => ({
+        id: a.id,
+        orderIndex: a.orderIndex,
+        step: a.step,
+        etape: a.etape,
+        horaireMode: a.horaireMode,
+        horaireManuel: a.horaireManuel,
+        dependsOnId: a.dependsOnId,
+      }));
+
+      pushUndoAction({
+        description: `Déplacement de « ${dragged.activite} »`,
+        undo: async () => {
+          await batchUpdateActivitiesOrder(activeEvent.id, prevOrderSnapshot);
+        },
+      });
+
       await batchUpdateActivitiesOrder(activeEvent.id, batchUpdates);
     }
 
@@ -840,30 +990,52 @@ function PlannerApp() {
           </button>
         </nav>
 
-        {/* Zone 3: 1 Primary Action */}
-        <div className="shrink-0">
+        {/* Zone 3: Primary Actions (Annuler & Nouvelle activité) */}
+        <div className="shrink-0 flex items-center gap-2">
           {(currentUserRole === 'admin' || currentUserRole === 'editeur') && (
-            <button
-              type="button"
-              onClick={() =>
-                setNewModalConfig({
-                  open: true,
-                  defaultStep:
-                    filterStep !== 'ALL' && filterStep !== 'UNSET'
-                      ? Number(filterStep)
-                      : 0,
-                  defaultEtape:
-                    filterEtape !== 'ALL'
-                      ? filterEtape
-                      : activeEvent.etapes[0] || '',
-                  defaultDependsOnId: null,
-                })
-              }
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap shrink-0 shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Nouvelle activité
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={undoStack.length === 0 || undoing}
+                onClick={handleUndo}
+                title={
+                  undoStack[0]
+                    ? `Annuler : ${undoStack[0].description} (Ctrl+Z)`
+                    : 'Aucune action à annuler (Ctrl+Z)'
+                }
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap shrink-0 shadow-sm"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${undoing ? 'animate-spin text-blue-600' : 'text-slate-600'}`} />
+                <span className="hidden sm:inline">Annuler</span>
+                {undoStack.length > 0 && (
+                  <span className="font-mono text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full font-semibold">
+                    {undoStack.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setNewModalConfig({
+                    open: true,
+                    defaultStep:
+                      filterStep !== 'ALL' && filterStep !== 'UNSET'
+                        ? Number(filterStep)
+                        : 0,
+                    defaultEtape:
+                      filterEtape !== 'ALL'
+                        ? filterEtape
+                        : activeEvent.etapes[0] || '',
+                    defaultDependsOnId: null,
+                  })
+                }
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap shrink-0 shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Nouvelle activité
+              </button>
+            </>
           )}
         </div>
       </header>
@@ -1343,6 +1515,42 @@ function PlannerApp() {
           onCreate={handleCreateActivity}
           onClose={() => setNewModalConfig((prev) => ({ ...prev, open: false }))}
         />
+      )}
+
+      {/* Floating Undo Toast Banner */}
+      {undoToast && (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-4 max-w-md"
+        >
+          <RotateCcw className="w-4 h-4 text-blue-400 shrink-0" />
+          <div className="text-xs leading-tight min-w-0 flex-1">
+            <span className="block text-slate-400 font-medium text-[10px] uppercase tracking-wider">
+              Dernière action
+            </span>
+            <span className="font-semibold text-white truncate block">
+              {undoToast.description}
+            </span>
+          </div>
+          <button
+            type="button"
+            disabled={undoing}
+            onClick={handleUndo}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow transition-colors shrink-0 disabled:opacity-50"
+          >
+            <RotateCcw className={`w-3 h-3 ${undoing ? 'animate-spin' : ''}`} />
+            Annuler (Ctrl+Z)
+          </button>
+          <button
+            type="button"
+            onClick={() => setUndoToast(null)}
+            className="p-1 text-slate-400 hover:text-white rounded transition-colors shrink-0"
+            title="Fermer la notification"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </aside>
       )}
     </div>
   );

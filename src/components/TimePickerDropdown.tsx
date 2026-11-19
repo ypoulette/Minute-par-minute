@@ -221,9 +221,10 @@ export const TimePickerDropdown: React.FC<TimePickerDropdownProps> = ({
               <button
                 type="button"
                 onClick={() => commitValue('', true)}
-                className="px-2 py-1 text-xs text-slate-500 bg-white border border-slate-200 rounded hover:bg-slate-100"
+                title="Effacer l'heure définie pour cette activité"
+                className="px-2 py-1 text-xs text-slate-600 bg-white border border-slate-200 rounded hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors"
               >
-                Effacer
+                Effacer l'heure
               </button>
             </div>
           </div>

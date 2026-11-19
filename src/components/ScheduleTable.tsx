@@ -1255,7 +1255,7 @@ const ActivityRow: React.FC<ActivityRowProps> = ({
               <button
                 type="button"
                 onClick={onRequestDelete}
-                title="Supprimer"
+                title="Supprimer définitivement l'activité complète"
                 className="p-1 text-slate-300 hover:text-red-600 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -1265,14 +1265,16 @@ const ActivityRow: React.FC<ActivityRowProps> = ({
                 <button
                   type="button"
                   onClick={onConfirmDelete}
-                  className="px-1.5 py-0.5 text-[11px] font-medium text-white bg-red-600 rounded hover:bg-red-700"
+                  title="Confirmer la suppression complète de l'activité"
+                  className="px-1.5 py-0.5 text-[11px] font-semibold text-white bg-red-600 rounded hover:bg-red-700"
                 >
-                  Suppr.
+                  Suppr. activité
                 </button>
                 <button
                   type="button"
                   onClick={onCancelDelete}
-                  className="px-1.5 py-0.5 text-[11px] text-slate-600 bg-slate-100 rounded"
+                  title="Annuler la suppression"
+                  className="px-1.5 py-0.5 text-[11px] text-slate-600 bg-slate-100 rounded hover:bg-slate-200"
                 >
                   Non
                 </button>
