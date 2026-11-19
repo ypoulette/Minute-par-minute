@@ -46,32 +46,47 @@ export function sanitizeExecutants(
   };
 }
 
+const DONE_TAG = '<!--STATUT_TERMINE-->';
 const COMMENT_START = '<!--REVISEUR_COMMENT-->\n';
 const COMMENT_END = '\n<!--/REVISEUR_COMMENT-->';
 
-export function packActivityTexte(cleanTexte: string, commentaires?: string): string {
+export function packActivityTexte(
+  cleanTexte: string,
+  commentaires?: string,
+  isDone?: boolean
+): string {
   const strippedText = (cleanTexte || '')
+    .replace(/<!--STATUT_TERMINE-->/g, '')
     .replace(/<!--REVISEUR_COMMENT-->[\s\S]*?<!--\/REVISEUR_COMMENT-->/g, '')
     .trim();
   const trimmedComment = (commentaires || '').trim();
 
-  if (!trimmedComment) {
-    return strippedText;
+  const parts: string[] = [];
+  if (isDone) {
+    parts.push(DONE_TAG);
   }
-  if (!strippedText) {
-    return `${COMMENT_START}${trimmedComment}${COMMENT_END}`;
+  if (strippedText) {
+    parts.push(strippedText);
   }
-  return `${strippedText}\n\n${COMMENT_START}${trimmedComment}${COMMENT_END}`;
+  if (trimmedComment) {
+    parts.push(`${COMMENT_START}${trimmedComment}${COMMENT_END}`);
+  }
+
+  return parts.join('\n\n').trim();
 }
 
 export function unpackActivityTexte(
   rawTexte: string | undefined,
   directCommentaires?: string
-): { cleanTexte: string; commentaires: string } {
+): { cleanTexte: string; commentaires: string; isDone: boolean } {
   const raw = rawTexte || '';
+  const isDone = raw.includes(DONE_TAG);
   const match = raw.match(/<!--REVISEUR_COMMENT-->([\s\S]*?)<!--\/REVISEUR_COMMENT-->/);
   const unpackedComm = match ? match[1].trim() : '';
-  const clean = raw.replace(/<!--REVISEUR_COMMENT-->[\s\S]*?<!--\/REVISEUR_COMMENT-->/g, '').trim();
+  const clean = raw
+    .replace(/<!--STATUT_TERMINE-->/g, '')
+    .replace(/<!--REVISEUR_COMMENT-->[\s\S]*?<!--\/REVISEUR_COMMENT-->/g, '')
+    .trim();
 
   const finalComm =
     directCommentaires && directCommentaires.trim()
@@ -81,6 +96,7 @@ export function unpackActivityTexte(
   return {
     cleanTexte: clean,
     commentaires: finalComm,
+    isDone,
   };
 }
 
@@ -98,6 +114,7 @@ export function sanitizeActivityFields(input: Partial<ActivityItem>): {
   dependsOnId: string | null;
   needsCorrection: boolean;
   commentaires: string;
+  isDone: boolean;
   texte: string;
 } {
   const exec = sanitizeExecutants(input.executants, input.executant);
@@ -120,6 +137,7 @@ export function sanitizeActivityFields(input: Partial<ActivityItem>): {
     dependsOnId: depId,
     needsCorrection: Boolean(input.needsCorrection),
     commentaires: (input.commentaires ?? '').slice(0, 50000),
+    isDone: Boolean(input.isDone),
     texte: (input.texte ?? '').slice(0, 50000),
   };
 }
@@ -185,6 +203,7 @@ export function subscribeEventActivities(
           ...(raw as Omit<ActivityItem, 'id'>),
           texte: unpacked.cleanTexte,
           commentaires: unpacked.commentaires,
+          isDone: raw.isDone !== undefined ? Boolean(raw.isDone) : unpacked.isDone,
         };
       });
       onData(list);
@@ -446,8 +465,8 @@ export async function createActivity(
 ): Promise<string> {
   const actId = makeSafeId('act');
   const clean = sanitizeActivityFields(input);
-  const packedTexte = packActivityTexte(clean.texte, clean.commentaires);
-  const { commentaires: _comm, ...cleanForFirestore } = clean;
+  const packedTexte = packActivityTexte(clean.texte, clean.commentaires, clean.isDone);
+  const { commentaires: _comm, isDone: _done, ...cleanForFirestore } = clean;
   const path = `events/${event.id}/activities/${actId}`;
 
   try {
@@ -513,16 +532,20 @@ export async function updateActivity(
 
   const hasTexteUpdate = updates.texte !== undefined;
   const hasCommUpdate = updates.commentaires !== undefined;
+  const hasDoneUpdate = updates.isDone !== undefined;
 
-  if (hasTexteUpdate || hasCommUpdate) {
+  if (hasTexteUpdate || hasCommUpdate || hasDoneUpdate) {
     const baseTexte = hasTexteUpdate
       ? updates.texte || ''
       : (currentActivity?.texte || '');
     const baseComm = hasCommUpdate
       ? updates.commentaires || ''
       : (currentActivity?.commentaires || '');
+    const baseDone = hasDoneUpdate
+      ? Boolean(updates.isDone)
+      : Boolean(currentActivity?.isDone);
 
-    payload.texte = packActivityTexte(baseTexte, baseComm).slice(0, 50000);
+    payload.texte = packActivityTexte(baseTexte, baseComm, baseDone).slice(0, 50000);
   }
 
   const path = `events/${eventId}/activities/${activityId}`;

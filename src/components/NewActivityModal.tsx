@@ -31,6 +31,7 @@ interface NewActivityModalProps {
     responsable: string;
     executants: string[];
     needsCorrection: boolean;
+    isDone?: boolean;
     texte: string;
   }) => Promise<void>;
   onClose: () => void;
@@ -67,6 +68,7 @@ export const NewActivityModal: React.FC<NewActivityModalProps> = ({
   const [activite, setActivite] = useState('');
   const [responsable, setResponsable] = useState('');
   const [executants, setExecutants] = useState<string[]>([]);
+  const [isDone, setIsDone] = useState(false);
   const [needsCorrection, setNeedsCorrection] = useState(false);
   const [texte, setTexte] = useState('');
   const [saving, setSaving] = useState(false);
@@ -145,6 +147,7 @@ export const NewActivityModal: React.FC<NewActivityModalProps> = ({
         responsable,
         executants,
         needsCorrection,
+        isDone,
         texte,
       });
       onClose();
@@ -424,15 +427,27 @@ export const NewActivityModal: React.FC<NewActivityModalProps> = ({
             />
           </div>
 
-          <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={needsCorrection}
-              onChange={(e) => setNeedsCorrection(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 accent-amber-600"
-            />
-            <span>Marquer comme nécessitant une correction</span>
-          </label>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
+            <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isDone}
+                onChange={(e) => setIsDone(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
+              />
+              <span>Activité déjà terminée</span>
+            </label>
+
+            <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={needsCorrection}
+                onChange={(e) => setNeedsCorrection(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 accent-amber-600"
+              />
+              <span>Marquer comme nécessitant une correction</span>
+            </label>
+          </div>
 
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
             <button

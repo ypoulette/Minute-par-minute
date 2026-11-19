@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  CheckCircle2,
   Clock,
   Link2,
   MessageSquare,
@@ -231,6 +232,22 @@ export const ActivityDetailPage: React.FC<ActivityDetailPageProps> = ({
             )}
             <span aria-hidden="true">·</span>
             <span className="font-mono tabular-nums">{activity.computedDate}</span>
+            {activity.isDone && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">
+                  <CheckCircle2 className="w-3 h-3" /> Terminée
+                </span>
+              </>
+            )}
+            {activity.needsCorrection && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">
+                  À corriger
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -654,6 +671,33 @@ export const ActivityDetailPage: React.FC<ActivityDetailPageProps> = ({
                   onAddOption={onAddResource}
                 />
               </div>
+            </div>
+
+            {/* Activité terminée */}
+            <div className="pt-3 border-t border-slate-100">
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  disabled={!canEditCore}
+                  checked={Boolean(activity.isDone)}
+                  onChange={(e) =>
+                    commitUpdate({ isDone: e.target.checked })
+                  }
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600 shrink-0"
+                />
+                <span className="text-xs leading-snug">
+                  <span
+                    className={`block font-medium ${
+                      activity.isDone ? 'text-emerald-800 font-semibold' : 'text-slate-800'
+                    }`}
+                  >
+                    Activité terminée
+                  </span>
+                  <span className="text-slate-500">
+                    Cocher quand cette activité a été réalisée avec succès
+                  </span>
+                </span>
+              </label>
             </div>
 
             {/* Correction nécessaire */}

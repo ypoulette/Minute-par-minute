@@ -34,6 +34,7 @@ export function exportActivitiesToExcel(
       Activité: `${indent}${act.activite}`,
       Responsable: act.responsable,
       'Exécutant(s)': executantLabel,
+      Statut: act.isDone ? 'Terminée' : 'À faire',
       'À corriger': act.needsCorrection ? 'Oui' : '',
       'Commentaires réviseur': act.commentaires || '',
     };
@@ -59,6 +60,7 @@ export function exportActivitiesToExcel(
     { wch: 62 }, // Activité
     { wch: 22 }, // Responsable
     { wch: 30 }, // Exécutant(s)
+    { wch: 12 }, // Statut
     { wch: 11 }, // À corriger
     { wch: 40 }, // Commentaires réviseur
   ];

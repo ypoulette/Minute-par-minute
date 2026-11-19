@@ -120,6 +120,7 @@ export const CompactFullTextView: React.FC<CompactFullTextViewProps> = ({
             <table className="w-full min-w-[1080px] table-fixed border-collapse text-left">
               <colgroup>
                 <col className="w-[34px]" />
+                <col className="w-[34px]" />
                 <col className="w-[44px]" />
                 <col className="w-[42px]" />
                 <col className="w-[96px]" />
@@ -133,6 +134,9 @@ export const CompactFullTextView: React.FC<CompactFullTextViewProps> = ({
               </colgroup>
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-medium text-slate-600">
+                  <th className="py-2 px-1 text-center" title="Activité terminée">
+                    Fait
+                  </th>
                   <th className="py-2 px-1 text-center" title="Correction nécessaire">
                     Corr.
                   </th>
@@ -171,6 +175,9 @@ export const CompactFullTextView: React.FC<CompactFullTextViewProps> = ({
                       blocLabel={etapeLabels[act.etape] || act.etape}
                       isNewDay={isNewDay}
                       onOpenDetail={() => onOpenDetail(act.id)}
+                      onToggleDone={(checked) =>
+                        onUpdateActivity(act.id, { isDone: checked })
+                      }
                       onToggleCorrection={(checked) =>
                         onUpdateActivity(act.id, { needsCorrection: checked })
                       }
@@ -270,6 +277,7 @@ export const CompactFullTextView: React.FC<CompactFullTextViewProps> = ({
                   <table className="w-full min-w-[1000px] table-fixed border-collapse text-left">
                     <colgroup>
                       <col className="w-[34px]" />
+                      <col className="w-[34px]" />
                       <col className="w-[44px]" />
                       <col className="w-[42px]" />
                       <col className="w-[82px]" />
@@ -282,6 +290,9 @@ export const CompactFullTextView: React.FC<CompactFullTextViewProps> = ({
                     </colgroup>
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50/50 text-[11px] font-medium text-slate-600">
+                        <th className="py-1.5 px-1 text-center" title="Activité terminée">
+                          Fait
+                        </th>
                         <th className="py-1.5 px-1 text-center" title="Correction nécessaire">
                           Corr.
                         </th>
@@ -319,6 +330,9 @@ export const CompactFullTextView: React.FC<CompactFullTextViewProps> = ({
                             blocLabel=""
                             isNewDay={isNewDay}
                             onOpenDetail={() => onOpenDetail(act.id)}
+                            onToggleDone={(checked) =>
+                              onUpdateActivity(act.id, { isDone: checked })
+                            }
                             onToggleCorrection={(checked) =>
                               onUpdateActivity(act.id, { needsCorrection: checked })
                             }
@@ -401,6 +415,7 @@ interface CompactRowProps {
   blocLabel: string;
   isNewDay: boolean;
   onOpenDetail: () => void;
+  onToggleDone: (checked: boolean) => Promise<void>;
   onToggleCorrection: (checked: boolean) => Promise<void>;
   onSaveText: (nextText: string) => Promise<void>;
 }
@@ -414,6 +429,7 @@ const CompactRow: React.FC<CompactRowProps> = ({
   blocLabel,
   isNewDay,
   onOpenDetail,
+  onToggleDone,
   onToggleCorrection,
   onSaveText,
 }) => {
@@ -448,13 +464,38 @@ const CompactRow: React.FC<CompactRowProps> = ({
   return (
     <tr
       className={`group align-top transition-colors ${
-        activity.needsCorrection
+        activity.isDone
+          ? 'bg-emerald-50/35 hover:bg-emerald-50/70'
+          : activity.needsCorrection
           ? 'bg-amber-50/55 hover:bg-amber-50/80'
           : isChild
           ? 'bg-slate-50/40 hover:bg-blue-50/25'
           : 'hover:bg-slate-50/80'
       } ${isNewDay ? 'border-t-2 border-t-slate-200' : ''}`}
     >
+      {/* Activité terminée */}
+      <td className="py-2 px-1 text-center">
+        <input
+          type="checkbox"
+          disabled={!canEditCore}
+          checked={Boolean(activity.isDone)}
+          onChange={(e) => onToggleDone(e.target.checked)}
+          aria-label="Activité terminée"
+          title={
+            canEditCore
+              ? activity.isDone
+                ? 'Marquer comme non terminée'
+                : 'Marquer comme terminée'
+              : activity.isDone
+              ? 'Activité terminée'
+              : 'Activité non terminée'
+          }
+          className={`w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 align-middle ${
+            canEditCore ? 'cursor-pointer' : 'cursor-default opacity-60'
+          }`}
+        />
+      </td>
+
       {/* Correction nécessaire */}
       <td className="py-2 px-1 text-center">
         <input

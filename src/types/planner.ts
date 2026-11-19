@@ -42,6 +42,7 @@ export interface ActivityItem {
   dependsOnId?: string | null;
   needsCorrection?: boolean;
   commentaires?: string; // Remarques / ajouts / modifications demandées par les réviseurs
+  isDone?: boolean; // Activité terminée / complétée
   texte: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;

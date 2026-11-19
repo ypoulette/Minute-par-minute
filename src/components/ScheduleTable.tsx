@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  Check,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   CornerDownRight,
@@ -161,6 +163,9 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-600">
                 <th className="w-8 py-2.5 pl-2.5 pr-1" aria-label="Déplacer" />
+                <th className="w-11 py-2.5 px-1 text-center" title="Activité terminée">
+                  Fait
+                </th>
                 <th className="w-11 py-2.5 px-1 text-center" title="Correction nécessaire">
                   Corr.
                 </th>
@@ -357,6 +362,9 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50/70 text-xs font-medium text-slate-600">
                         <th className="w-8 py-2 pl-2.5 pr-1" aria-label="Déplacer" />
+                        <th className="w-11 py-2 px-1 text-center" title="Activité terminée">
+                          Fait
+                        </th>
                         <th className="w-11 py-2 px-1 text-center" title="Correction nécessaire">
                           Corr.
                         </th>
@@ -893,6 +901,8 @@ const ActivityRow: React.FC<ActivityRowProps> = ({
       className={`group transition-colors ${
         isDragging
           ? 'opacity-40 bg-blue-50/50'
+          : activity.isDone
+          ? 'bg-emerald-50/35 hover:bg-emerald-50/70'
           : activity.needsCorrection
           ? 'bg-amber-50/55 hover:bg-amber-50/80'
           : isChild
@@ -921,6 +931,29 @@ const ActivityRow: React.FC<ActivityRowProps> = ({
         ) : (
           <div className="w-4 h-4" />
         )}
+      </td>
+
+      {/* Activité terminée checkbox */}
+      <td className="py-1.5 px-1 align-middle text-center">
+        <input
+          type="checkbox"
+          disabled={!canEditCore}
+          checked={Boolean(activity.isDone)}
+          onChange={(e) => onUpdate({ isDone: e.target.checked })}
+          aria-label="Activité terminée"
+          title={
+            canEditCore
+              ? activity.isDone
+                ? 'Marquer comme non terminée'
+                : 'Marquer comme terminée'
+              : activity.isDone
+              ? 'Activité terminée'
+              : 'Activité non terminée'
+          }
+          className={`w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 align-middle ${
+            canEditCore ? 'cursor-pointer' : 'cursor-default opacity-60'
+          }`}
+        />
       </td>
 
       {/* Correction nécessaire checkbox */}
@@ -1117,25 +1150,31 @@ const ActivityRow: React.FC<ActivityRowProps> = ({
                 {activity.activite}
               </span>
 
-              {(parentActivity || activity.childCount > 0 || activity.needsCorrection) && (
+              {(parentActivity || activity.childCount > 0 || activity.needsCorrection || activity.isDone) && (
                 <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] leading-tight">
+                  {activity.isDone && (
+                    <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.5 rounded">
+                      <Check className="w-3 h-3" />
+                      Fait
+                    </span>
+                  )}
                   {activity.needsCorrection && (
                     <span className="font-medium text-amber-800">
-                      À corriger
+                      {activity.isDone ? '· ' : ''}À corriger
                     </span>
                   )}
                   {parentActivity && (
                     <span className="inline-flex items-center gap-1 text-blue-700/85 truncate max-w-[260px]">
                       <CornerDownRight className="w-3 h-3 shrink-0" />
                       <span>
-                        {activity.needsCorrection ? '· ' : ''}Dépend de #{parentActivity.wbsCode}
+                        {activity.isDone || activity.needsCorrection ? '· ' : ''}Dépend de #{parentActivity.wbsCode}
                         {!showTreeLines ? ` — ${parentActivity.activite}` : ''}
                       </span>
                     </span>
                   )}
                   {activity.childCount > 0 && (
                     <span className="text-slate-500 font-mono tabular-nums">
-                      {parentActivity || activity.needsCorrection ? '· ' : ''}
+                      {parentActivity || activity.needsCorrection || activity.isDone ? '· ' : ''}
                       {activity.childCount} sous-activité
                       {activity.childCount > 1 ? 's' : ''} liée
                       {activity.childCount > 1 ? 's' : ''}

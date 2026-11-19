@@ -84,6 +84,7 @@ function PlannerApp() {
   const [filterEtape, setFilterEtape] = useState('ALL');
   const [filterResource, setFilterResource] = useState('ALL');
   const [filterStep, setFilterStep] = useState('ALL');
+  const [filterCompletion, setFilterCompletion] = useState<'ALL' | 'TODO' | 'DONE'>('ALL');
   const [filterCorrectionOnly, setFilterCorrectionOnly] = useState(false);
 
   // Inline states
@@ -207,11 +208,18 @@ function PlannerApp() {
     [computedActivities]
   );
 
+  const doneCount = useMemo(
+    () => computedActivities.filter((a) => Boolean(a.isDone)).length,
+    [computedActivities]
+  );
+  const todoCount = computedActivities.length - doneCount;
+
   const hasActiveFilters = Boolean(
     searchQuery.trim() ||
       filterEtape !== 'ALL' ||
       filterResource !== 'ALL' ||
       filterStep !== 'ALL' ||
+      filterCompletion !== 'ALL' ||
       filterCorrectionOnly
   );
 
@@ -220,6 +228,8 @@ function PlannerApp() {
     const q = searchQuery.trim().toLowerCase();
     return computedActivities.filter((act) => {
       if (filterCorrectionOnly && !act.needsCorrection) return false;
+      if (filterCompletion === 'TODO' && act.isDone) return false;
+      if (filterCompletion === 'DONE' && !act.isDone) return false;
       if (filterEtape !== 'ALL' && act.etape !== filterEtape) return false;
       if (
         filterResource !== 'ALL' &&
@@ -246,6 +256,7 @@ function PlannerApp() {
     filterEtape,
     filterResource,
     filterStep,
+    filterCompletion,
     filterCorrectionOnly,
   ]);
 
@@ -415,6 +426,7 @@ function PlannerApp() {
     responsable: string;
     executants: string[];
     needsCorrection: boolean;
+    isDone?: boolean;
     texte: string;
   }) => {
     if (!activeEvent) return;
@@ -1161,6 +1173,23 @@ function PlannerApp() {
                 ))}
               </select>
 
+              <select
+                value={filterCompletion}
+                onChange={(e) => setFilterCompletion(e.target.value as 'ALL' | 'TODO' | 'DONE')}
+                aria-label="Filtrer par statut de réalisation"
+                className={`px-2.5 py-1.5 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 ${
+                  filterCompletion === 'DONE'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-medium'
+                    : filterCompletion === 'TODO'
+                    ? 'bg-blue-50 text-blue-800 border-blue-300 font-medium'
+                    : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}
+              >
+                <option value="ALL">Tous les statuts</option>
+                <option value="TODO">À faire ({todoCount})</option>
+                <option value="DONE">Terminées ({doneCount})</option>
+              </select>
+
               <button
                 type="button"
                 onClick={() => setFilterCorrectionOnly((prev) => !prev)}
@@ -1180,6 +1209,24 @@ function PlannerApp() {
                   ({correctionCount})
                 </span>
               </button>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setFilterStep('ALL');
+                    setFilterEtape('ALL');
+                    setFilterResource('ALL');
+                    setFilterCompletion('ALL');
+                    setFilterCorrectionOnly(false);
+                  }}
+                  className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:underline cursor-pointer whitespace-nowrap"
+                  title="Réinitialiser tous les filtres"
+                >
+                  Effacer filtres
+                </button>
+              )}
 
               <div className="text-xs text-slate-500 font-mono tabular-nums ml-auto">
                 {visibleActivities.length} / {computedActivities.length} activités
