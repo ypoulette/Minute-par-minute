@@ -4,6 +4,7 @@ import {
   Calendar,
   Download,
   FileSpreadsheet,
+  HelpCircle,
   Layers,
   LogOut,
   Plus,
@@ -16,6 +17,7 @@ import { ActivityDetailPage } from './components/ActivityDetailPage';
 import { AuthScreen } from './components/AuthScreen';
 import { CompactFullTextView } from './components/CompactFullTextView';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { HelpModal } from './components/HelpModal';
 import { ImportCsvModal } from './components/ImportCsvModal';
 import { NewActivityModal } from './components/NewActivityModal';
 import { ResourcesModal } from './components/ResourcesModal';
@@ -133,6 +135,7 @@ function PlannerApp() {
   const [showResourcesModal, setShowResourcesModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [newModalConfig, setNewModalConfig] = useState<{
     open: boolean;
     defaultStep: number | null;
@@ -832,15 +835,24 @@ function PlannerApp() {
 
   // Signed out or awaiting email verification
   if (!user) {
-    return <AuthScreen />;
+    return (
+      <>
+        <AuthScreen onOpenHelp={() => setShowHelpModal(true)} />
+        {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
+      </>
+    );
   }
 
   if (!user.emailVerified) {
     return (
-      <AuthScreen
-        pendingVerificationUser={user}
-        onEmailVerified={() => setEmailVerifiedTick((t) => t + 1)}
-      />
+      <>
+        <AuthScreen
+          pendingVerificationUser={user}
+          onEmailVerified={() => setEmailVerifiedTick((t) => t + 1)}
+          onOpenHelp={() => setShowHelpModal(true)}
+        />
+        {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
+      </>
     );
   }
 
@@ -987,6 +999,15 @@ function PlannerApp() {
             className="whitespace-nowrap shrink-0 py-1 border-b-2 border-transparent hover:text-slate-900 transition-colors"
           >
             Importer CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowHelpModal(true)}
+            className="whitespace-nowrap shrink-0 py-1 border-b-2 border-transparent hover:text-blue-600 transition-colors flex items-center gap-1.5 font-medium"
+            title="Consulter le manuel de l'utilisateur et l'aide"
+          >
+            <HelpCircle className="w-4 h-4 text-blue-600" />
+            <span>Aide</span>
           </button>
         </nav>
 
@@ -1259,6 +1280,14 @@ function PlannerApp() {
               >
                 Importer CSV
               </button>
+              <button
+                type="button"
+                onClick={() => setShowHelpModal(true)}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md whitespace-nowrap"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                Aide
+              </button>
             </div>
 
             {/* Filter & Grouping Bar */}
@@ -1500,6 +1529,10 @@ function PlannerApp() {
           onCreateNewEvent={handleCreateNewEventFromCsv}
           onClose={() => setShowImportModal(false)}
         />
+      )}
+
+      {showHelpModal && (
+        <HelpModal onClose={() => setShowHelpModal(false)} />
       )}
 
       {newModalConfig.open && (

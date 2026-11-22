@@ -11,7 +11,7 @@ import {
   type OAuthCredential,
   type User,
 } from 'firebase/auth';
-import { Check, Eye, EyeOff, KeyRound, Mail, RefreshCw } from 'lucide-react';
+import { Check, Eye, EyeOff, HelpCircle, KeyRound, Mail, RefreshCw } from 'lucide-react';
 import { auth, googleProvider } from '../lib/firebase';
 
 function formatAuthError(err: unknown, context: 'google' | 'email' = 'email'): string {
@@ -59,11 +59,13 @@ function formatAuthError(err: unknown, context: 'google' | 'email' = 'email'): s
 interface AuthScreenProps {
   pendingVerificationUser?: User | null;
   onEmailVerified?: () => void;
+  onOpenHelp?: () => void;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({
   pendingVerificationUser = null,
   onEmailVerified,
+  onOpenHelp,
 }) => {
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin');
   const [email, setEmail] = useState('');
@@ -506,6 +508,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 : 'Se connecter'}
             </button>
           </form>
+
+          {onOpenHelp && (
+            <div className="pt-2 border-t border-slate-100 text-center">
+              <button
+                type="button"
+                onClick={onOpenHelp}
+                className="text-xs text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1.5 font-medium"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-blue-500" />
+                <span>Besoin d'aide ? Consulter le manuel de l'utilisateur</span>
+              </button>
+            </div>
+          )}
         </div>
       </main>
     </div>
