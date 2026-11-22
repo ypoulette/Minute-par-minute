@@ -333,6 +333,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             Continuer avec Google
           </button>
 
+          <div className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-1">
+            <p>
+              💡 <strong className="font-medium text-slate-700">Sur iPad ou Safari :</strong> Si une page d&apos;erreur <em>« missing initial state »</em> apparaît, connectez-vous plutôt avec votre <strong>courriel et mot de passe</strong> ci-dessous.
+            </p>
+            <p className="text-[10px] text-slate-400">
+              (Ou dans les <strong>Réglages &gt; Safari</strong> de l&apos;iPad, désactivez temporairement <em>« Empêcher le suivi intersite »</em>).
+            </p>
+          </div>
+
           <div className="relative flex items-center">
             <div className="flex-grow border-t border-slate-200" />
             <span className="shrink-0 mx-3 text-xs text-slate-400">
