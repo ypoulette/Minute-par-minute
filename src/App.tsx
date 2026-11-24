@@ -833,24 +833,11 @@ function PlannerApp() {
     );
   }
 
-  // Signed out or awaiting email verification
+  // Signed out
   if (!user) {
     return (
       <>
         <AuthScreen onOpenHelp={() => setShowHelpModal(true)} />
-        {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
-      </>
-    );
-  }
-
-  if (!user.emailVerified) {
-    return (
-      <>
-        <AuthScreen
-          pendingVerificationUser={user}
-          onEmailVerified={() => setEmailVerifiedTick((t) => t + 1)}
-          onOpenHelp={() => setShowHelpModal(true)}
-        />
         {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
       </>
     );

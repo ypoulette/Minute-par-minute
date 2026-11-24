@@ -277,12 +277,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setBusy(true);
     try {
       if (mode === 'signup') {
-        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-        try {
-          await sendEmailVerification(cred.user);
-        } catch {
-          // User still lands on verification screen where they can resend
-        }
+        await createUserWithEmailAndPassword(auth, cleanEmail, password);
       } else {
         const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
         if (pendingGoogleCred) {
