@@ -121,6 +121,8 @@ function PlannerApp() {
 
   const [events, setEvents] = useState<EventPlan[]>([]);
   const [eventsLoaded, setEventsLoaded] = useState(false);
+  const [eventsLoadError, setEventsLoadError] = useState<string | null>(null);
+  const [loadingTimeoutPassed, setLoadingTimeoutPassed] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [activitiesLoaded, setActivitiesLoaded] = useState(false);
@@ -182,18 +184,38 @@ function PlannerApp() {
   // Permettre un accès direct et fluide aux membres de l'équipe dès la connexion
   const isEmailVerified = Boolean(user?.email);
 
-  // 2. Subscribe to events accessible by the signed-in, verified user
+  // 2. Subscribe to events accessible by the signed-in user
   useEffect(() => {
     if (!authReady || !user?.email || !isEmailVerified) return;
-    const unsub = subscribeUserEvents(user.email, (list) => {
-      setEvents(list);
-      setEventsLoaded(true);
-      setSelectedEventId((prev) => {
-        if (prev && list.some((e) => e.id === prev)) return prev;
-        return list[0]?.id || '';
-      });
-    });
-    return () => unsub();
+    setEventsLoadError(null);
+    setLoadingTimeoutPassed(false);
+
+    const timer = setTimeout(() => {
+      setLoadingTimeoutPassed(true);
+    }, 6000);
+
+    const unsub = subscribeUserEvents(
+      user.email,
+      (list) => {
+        clearTimeout(timer);
+        setEvents(list);
+        setEventsLoaded(true);
+        setEventsLoadError(null);
+        setSelectedEventId((prev) => {
+          if (prev && list.some((e) => e.id === prev)) return prev;
+          return list[0]?.id || '';
+        });
+      },
+      (err) => {
+        clearTimeout(timer);
+        console.error('Erreur souscription événements:', err);
+        setEventsLoadError(err.message || 'Impossible de charger les événements partagés.');
+      }
+    );
+    return () => {
+      clearTimeout(timer);
+      unsub();
+    };
   }, [authReady, user?.email, isEmailVerified, emailVerifiedTick]);
 
   const activeEvent = useMemo(
@@ -846,17 +868,83 @@ function PlannerApp() {
   // Signed in, loading events or seeding
   if (!eventsLoaded || seeding) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-6 max-w-md w-full text-center space-y-2">
-          <p className="text-sm font-medium text-slate-900">
-            {seeding
-              ? 'Importation du déroulement initial (CSV)...'
-              : 'Chargement des événements partagés...'}
-          </p>
-          <p className="text-xs text-slate-500">
-            Synchronisation en temps réel avec votre équipe.
-          </p>
-        </div>
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between gap-8">
+          <span className="font-display text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0">
+            ChronoPlan
+          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-mono text-slate-500">{user.email}</span>
+            <button
+              type="button"
+              onClick={() => signOut(auth)}
+              className="text-xs font-medium text-slate-600 hover:text-slate-900"
+            >
+              Déconnexion
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-md w-full text-center space-y-4 shadow-sm">
+            <div className="space-y-1.5">
+              <p className="text-sm font-semibold text-slate-900">
+                {seeding
+                  ? 'Importation du déroulement initial (CSV)...'
+                  : 'Chargement des événements partagés...'}
+              </p>
+              <p className="text-xs text-slate-500">
+                Synchronisation en temps réel avec votre équipe.
+              </p>
+            </div>
+
+            {eventsLoadError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-left space-y-2">
+                <p className="text-xs font-medium text-red-800">
+                  Erreur de synchronisation :
+                </p>
+                <p className="text-[11px] font-mono text-red-700 break-words leading-relaxed">
+                  {eventsLoadError}
+                </p>
+                <p className="text-[11px] text-red-600">
+                  Si le message indique des permissions insuffisantes, vérifiez que votre adresse est bien autorisée par le propriétaire.
+                </p>
+              </div>
+            )}
+
+            {!eventsLoadError && loadingTimeoutPassed && (
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg text-left space-y-2">
+                <p className="text-xs font-medium text-amber-900">
+                  ⏱️ La synchronisation prend plus de temps que prévu
+                </p>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Le navigateur tente peut-être de réutiliser un ancien cache ou un ancien jeton de session.
+                </p>
+                <ul className="text-[11px] text-amber-800 list-disc list-inside space-y-1">
+                  <li>Ouvrez le lien dans une <strong>fenêtre de navigation privée</strong>.</li>
+                  <li>Ou forcez l&apos;actualisation avec <strong>Ctrl + F5</strong> (ou <em>Cmd + Shift + R</em>).</li>
+                </ul>
+              </div>
+            )}
+
+            <div className="pt-2 flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="flex-1 py-2 px-3 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                Actualiser la page
+              </button>
+              <button
+                type="button"
+                onClick={() => signOut(auth)}
+                className="flex-1 py-2 px-3 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+              >
+                Se déconnecter
+              </button>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }

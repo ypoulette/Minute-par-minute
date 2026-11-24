@@ -144,7 +144,8 @@ export function sanitizeActivityFields(input: Partial<ActivityItem>): {
 
 export function subscribeUserEvents(
   userEmail: string,
-  onData: (events: EventPlan[]) => void
+  onData: (events: EventPlan[]) => void,
+  onError?: (err: Error) => void
 ): Unsubscribe {
   const emailLower = userEmail.toLowerCase();
   const path = 'events';
@@ -175,7 +176,12 @@ export function subscribeUserEvents(
       onData(list);
     },
     (error) => {
-      handleFirestoreError(error, OperationType.LIST, path);
+      console.error('Erreur Firestore subscribeUserEvents:', error);
+      if (onError) {
+        onError(error instanceof Error ? error : new Error(String(error)));
+      } else {
+        handleFirestoreError(error, OperationType.LIST, path);
+      }
     }
   );
 }
