@@ -334,8 +334,8 @@ export async function replaceEventActivitiesFromCsv(
     for (const item of chunk) {
       const actId = makeSafeId('act');
       const clean = sanitizeActivityFields(item);
-      const packedTexte = packActivityTexte(clean.texte, clean.commentaires);
-      const { commentaires: _comm, ...cleanForFirestore } = clean;
+      const packedTexte = packActivityTexte(clean.texte, clean.commentaires, clean.isDone);
+      const { commentaires: _comm, isDone: _done, ...cleanForFirestore } = clean;
       batch.set(doc(db, 'events', event.id, 'activities', actId), {
         eventId: event.id,
         ownerId: event.ownerId,
@@ -352,6 +352,72 @@ export async function replaceEventActivitiesFromCsv(
       handleFirestoreError(error, OperationType.CREATE, `events/${event.id}/activities`);
     }
   }
+}
+
+export async function appendEventActivitiesFromCsv(
+  event: EventPlan,
+  existingActivities: ActivityItem[],
+  parsed: ParsedCsvPlan
+): Promise<number> {
+  // 1. Merge resources & etapes without altering existing ones
+  const mergedResources = Array.from(
+    new Set([...event.resources, ...parsed.resources].map((r) => r.trim().slice(0, 120)).filter(Boolean))
+  ).slice(0, 200);
+  const mergedEtapes = Array.from(
+    new Set([...event.etapes, ...parsed.etapes].map((e) => e.trim().slice(0, 120)).filter(Boolean))
+  ).slice(0, 50);
+  const mergedDetails = sanitizeEtapeDetails({
+    ...(parsed.etapeDetails || {}),
+    ...(event.etapeDetails || {}),
+  });
+
+  try {
+    await updateDoc(doc(db, 'events', event.id), {
+      resources: mergedResources,
+      etapes: mergedEtapes,
+      etapeDetails: mergedDetails,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `events/${event.id}`);
+  }
+
+  // 2. Determine base orderIndex (after the last existing activity)
+  let maxOrder = 0;
+  for (const act of existingActivities) {
+    if (typeof act.orderIndex === 'number' && act.orderIndex > maxOrder) {
+      maxOrder = act.orderIndex;
+    }
+  }
+
+  // 3. Create new activities in chunks (offsetting orderIndex)
+  for (let i = 0; i < parsed.activities.length; i += 400) {
+    const chunk = parsed.activities.slice(i, i + 400);
+    const batch = writeBatch(db);
+    chunk.forEach((item, idx) => {
+      const actId = makeSafeId('act');
+      const clean = sanitizeActivityFields(item);
+      const packedTexte = packActivityTexte(clean.texte, clean.commentaires, clean.isDone);
+      const { commentaires: _comm, isDone: _done, ...cleanForFirestore } = clean;
+      batch.set(doc(db, 'events', event.id, 'activities', actId), {
+        eventId: event.id,
+        ownerId: event.ownerId,
+        teamEmails: event.teamEmails,
+        ...cleanForFirestore,
+        orderIndex: maxOrder + (i + idx + 1) * 10,
+        texte: packedTexte,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    });
+    try {
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `events/${event.id}/activities`);
+    }
+  }
+
+  return parsed.activities.length;
 }
 
 export function sanitizeEtapeDetails(

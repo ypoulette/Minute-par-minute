@@ -170,6 +170,7 @@ export const CompactFullTextView: React.FC<CompactFullTextViewProps> = ({
                       activity={act}
                       parentActivity={parentAct}
                       canEditCore={canEditCore}
+                      canEditComments={canEditComments}
                       canToggleCorrection={canToggleCorrection}
                       showBlocColumn
                       blocLabel={etapeLabels[act.etape] || act.etape}
@@ -325,6 +326,7 @@ export const CompactFullTextView: React.FC<CompactFullTextViewProps> = ({
                             activity={act}
                             parentActivity={parentAct}
                             canEditCore={canEditCore}
+                            canEditComments={canEditComments}
                             canToggleCorrection={canToggleCorrection}
                             showBlocColumn={false}
                             blocLabel=""
@@ -410,6 +412,7 @@ interface CompactRowProps {
   activity: ComputedActivity;
   parentActivity: ComputedActivity | null;
   canEditCore?: boolean;
+  canEditComments?: boolean;
   canToggleCorrection?: boolean;
   showBlocColumn: boolean;
   blocLabel: string;
@@ -424,6 +427,7 @@ const CompactRow: React.FC<CompactRowProps> = ({
   activity,
   parentActivity,
   canEditCore = true,
+  canEditComments = true,
   canToggleCorrection = true,
   showBlocColumn,
   blocLabel,

@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import {
   Calendar,
+  Check,
+  ChevronDown,
   Download,
   FileSpreadsheet,
   HelpCircle,
@@ -25,6 +27,7 @@ import { ScheduleTable } from './components/ScheduleTable';
 import { TeamModal } from './components/TeamModal';
 import { auth } from './lib/firebase';
 import {
+  appendEventActivitiesFromCsv,
   batchUpdateActivitiesOrder,
   createActivity,
   createEventWithCsv,
@@ -154,6 +157,9 @@ function PlannerApp() {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [filterEtape, setFilterEtape] = useState('ALL');
+  const [selectedEtapes, setSelectedEtapes] = useState<string[]>([]);
+  const [showBlocDropdown, setShowBlocDropdown] = useState(false);
+  const blocDropdownRef = useRef<HTMLDivElement>(null);
   const [filterResource, setFilterResource] = useState('ALL');
   const [filterStep, setFilterStep] = useState('ALL');
   const [filterCompletion, setFilterCompletion] = useState<'ALL' | 'TODO' | 'DONE'>('ALL');
@@ -181,7 +187,17 @@ function PlannerApp() {
     return () => unsub();
   }, []);
 
-  // Permettre un accès direct et fluide aux membres de l'équipe dès la connexion
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (blocDropdownRef.current && !blocDropdownRef.current.contains(e.target as Node)) {
+        setShowBlocDropdown(false);
+      }
+    }
+    if (showBlocDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showBlocDropdown]);
   const isEmailVerified = Boolean(user?.email);
 
   // 2. Subscribe to events accessible by the signed-in user
@@ -306,9 +322,15 @@ function PlannerApp() {
   );
   const todoCount = computedActivities.length - doneCount;
 
+  const isBlocFiltered = Boolean(
+    selectedEtapes.length > 0 &&
+      activeEvent &&
+      selectedEtapes.length < activeEvent.etapes.length
+  );
+
   const hasActiveFilters = Boolean(
     searchQuery.trim() ||
-      filterEtape !== 'ALL' ||
+      isBlocFiltered ||
       filterResource !== 'ALL' ||
       filterStep !== 'ALL' ||
       filterCompletion !== 'ALL' ||
@@ -318,11 +340,13 @@ function PlannerApp() {
   // Filtered activities for Liste simple & Texte complet
   const visibleActivities = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const selectedSet = new Set(selectedEtapes);
+
     return computedActivities.filter((act) => {
       if (filterCorrectionOnly && !act.needsCorrection) return false;
       if (filterCompletion === 'TODO' && act.isDone) return false;
       if (filterCompletion === 'DONE' && !act.isDone) return false;
-      if (filterEtape !== 'ALL' && act.etape !== filterEtape) return false;
+      if (isBlocFiltered && !selectedSet.has(act.etape)) return false;
       if (
         filterResource !== 'ALL' &&
         act.responsable !== filterResource &&
@@ -345,7 +369,8 @@ function PlannerApp() {
   }, [
     computedActivities,
     searchQuery,
-    filterEtape,
+    isBlocFiltered,
+    selectedEtapes,
     filterResource,
     filterStep,
     filterCompletion,
@@ -834,6 +859,11 @@ function PlannerApp() {
     await batchUpdateActivitiesOrder(activeEvent.id, batchUpdates);
   };
 
+  const handleAppendCsv = async (parsed: ParsedCsvPlan) => {
+    if (!activeEvent) return;
+    await appendEventActivitiesFromCsv(activeEvent, activities, parsed);
+  };
+
   const handleReplaceCsv = async (parsed: ParsedCsvPlan) => {
     if (!activeEvent) return;
     await replaceEventActivitiesFromCsv(activeEvent, activities, parsed);
@@ -1120,8 +1150,8 @@ function PlannerApp() {
                         ? Number(filterStep)
                         : 0,
                     defaultEtape:
-                      filterEtape !== 'ALL'
-                        ? filterEtape
+                      selectedEtapes.length === 1
+                        ? selectedEtapes[0]
                         : activeEvent.etapes[0] || '',
                     defaultDependsOnId: null,
                   })
@@ -1418,22 +1448,129 @@ function PlannerApp() {
                 ))}
               </select>
 
-              <select
-                value={filterEtape}
-                onChange={(e) => setFilterEtape(e.target.value)}
-                aria-label="Filtrer par bloc"
-                className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                <option value="ALL">Tous les blocs</option>
-                {activeEvent.etapes.map((et) => {
-                  const detail = getEtapeDisplay(et, activeEvent.etapeDetails);
-                  return (
-                    <option key={et} value={et}>
-                      {detail.title ? `${et} — ${detail.title}` : et}
-                    </option>
-                  );
-                })}
-              </select>
+              {/* Multi-sélection des blocs */}
+              <div className="relative" ref={blocDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowBlocDropdown((prev) => !prev)}
+                  className={`flex items-center justify-between gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-colors whitespace-nowrap cursor-pointer ${
+                    isBlocFiltered
+                      ? 'bg-blue-50 border-blue-300 text-blue-900 font-medium'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                  title="Filtrer les blocs (par défaut tous visibles)"
+                >
+                  <span className="truncate max-w-[150px]">
+                    {!isBlocFiltered
+                      ? `Tous les blocs (${activeEvent.etapes.length})`
+                      : selectedEtapes.length === 1
+                      ? selectedEtapes[0]
+                      : `${selectedEtapes.length} blocs sélectionnés`}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </button>
+
+                {showBlocDropdown && (
+                  <div className="absolute left-0 mt-1 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-40 p-2 space-y-2 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="flex items-center justify-between px-2 pb-1.5 border-b border-slate-100 text-xs">
+                      <span className="font-semibold text-slate-900">Blocs affichés</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedEtapes([])}
+                          className="text-[11px] text-blue-600 hover:underline font-medium"
+                        >
+                          Tous
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedEtapes(['__NONE__'])}
+                          className="text-[11px] text-slate-500 hover:text-slate-800 hover:underline"
+                        >
+                          Aucun
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto space-y-0.5 pr-1">
+                      {activeEvent.etapes.map((et) => {
+                        const detail = getEtapeDisplay(et, activeEvent.etapeDetails);
+                        const count = computedActivities.filter((a) => a.etape === et).length;
+                        const isChecked =
+                          selectedEtapes.length === 0
+                            ? true
+                            : selectedEtapes.includes(et);
+
+                        const toggleBloc = () => {
+                          if (selectedEtapes.length === 0) {
+                            setSelectedEtapes(activeEvent.etapes.filter((x) => x !== et));
+                          } else if (selectedEtapes.includes(et)) {
+                            const next = selectedEtapes.filter((x) => x !== et);
+                            setSelectedEtapes(next.length === 0 ? ['__NONE__'] : next);
+                          } else {
+                            const next = [...selectedEtapes.filter((x) => x !== '__NONE__'), et];
+                            if (next.length >= activeEvent.etapes.length) {
+                              setSelectedEtapes([]);
+                            } else {
+                              setSelectedEtapes(next);
+                            }
+                          }
+                        };
+
+                        return (
+                          <div
+                            key={et}
+                            className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer select-none transition-colors ${
+                              isChecked
+                                ? 'bg-slate-50 hover:bg-slate-100'
+                                : 'hover:bg-slate-50/60 opacity-60'
+                            }`}
+                            onClick={toggleBloc}
+                          >
+                            <label className="flex items-center gap-2 min-w-0 cursor-pointer flex-1">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={toggleBloc}
+                                className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+                              />
+                              <span
+                                className="truncate text-slate-800 font-medium"
+                                title={detail.title ? `${et} — ${detail.title}` : et}
+                              >
+                                {et}
+                                {detail.title && (
+                                  <span className="text-slate-500 font-normal ml-1">
+                                    — {detail.title}
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                ({count})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedEtapes([et]);
+                                }}
+                                className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline px-1 py-0.5 rounded"
+                                title={`Afficher uniquement ${et}`}
+                              >
+                                Seul
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <select
                 value={filterResource}
@@ -1493,6 +1630,7 @@ function PlannerApp() {
                     setSearchQuery('');
                     setFilterStep('ALL');
                     setFilterEtape('ALL');
+                    setSelectedEtapes([]);
                     setFilterResource('ALL');
                     setFilterCompletion('ALL');
                     setFilterCorrectionOnly(false);
@@ -1600,6 +1738,7 @@ function PlannerApp() {
       {showImportModal && (
         <ImportCsvModal
           currentEventDate={activeEvent.eventDate}
+          onAppendActivities={handleAppendCsv}
           onReplaceCurrent={handleReplaceCsv}
           onCreateNewEvent={handleCreateNewEventFromCsv}
           onClose={() => setShowImportModal(false)}
